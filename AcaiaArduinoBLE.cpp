@@ -1,5 +1,5 @@
 /*
-  AcaiaArduinoBLE.cpp - Library for connecting to 
+  AcaiaArduinoBLE.cpp - Library for connecting to
   an Acaia Scale using the ArduinoBLE library.
   Created by Tate Mazer, December 13, 2023.
   Released into the public domain.
@@ -21,10 +21,31 @@ byte TARE_GENERIC[6]            = { 0x03, 0x0a, 0x01, 0x00, 0x00, 0x08 };
 byte START_TIMER_GENERIC[6]     = { 0x03, 0x0a, 0x04, 0x00, 0x00, 0x0a };
 byte STOP_TIMER_GENERIC[6]      = { 0x03, 0x0a, 0x05, 0x00, 0x00, 0x0d };
 byte RESET_TIMER_GENERIC[6]     = { 0x03, 0x0a, 0x06, 0x00, 0x00, 0x0c };
+byte TARE_ECLAIR[3]             = { 0x54, 0x01, 0x01 };
+byte START_TIMER_ECLAIR[3]      = { 0x53, 0x01, 0x01 };
+byte STOP_TIMER_ECLAIR[3]       = { 0x45, 0x01, 0x01 };
+byte RESET_TIMER_ECLAIR[3]      = { 0x52, 0x01, 0x01 };
 
 /* Generic commands from
    https://github.com/graphefruit/Beanconqueror/blob/master/src/classes/devices/felicita/constants.ts
 */
+
+uint8_t calculateXOR(const byte data[], int length){
+    uint8_t result = 0;
+    for(int i = 0; i < length; i++){
+        result ^= data[i];
+    }
+    return result;
+}
+
+int32_t readInt32LittleEndian(const byte data[]){
+    return (int32_t)(
+        ((uint32_t)data[0]) |
+        ((uint32_t)data[1] << 8) |
+        ((uint32_t)data[2] << 16) |
+        ((uint32_t)data[3] << 24)
+    );
+}
 
 AcaiaArduinoBLE::AcaiaArduinoBLE(bool debug){
     _debug = debug;
@@ -114,8 +135,13 @@ bool AcaiaArduinoBLE::init(String mac){
             } else if(peripheral.characteristic(READ_CHAR_GENERIC).canSubscribe()){
                 Serial.println("Generic Scale Detected");
                 _type   = GENERIC;
-	            _write  = peripheral.characteristic(WRITE_CHAR_GENERIC);
-	            _read   = peripheral.characteristic(READ_CHAR_GENERIC);
+		            _write  = peripheral.characteristic(WRITE_CHAR_GENERIC);
+		            _read   = peripheral.characteristic(READ_CHAR_GENERIC);
+            } else if(peripheral.characteristic(READ_CHAR_ECLAIR).canSubscribe()){
+                Serial.println("Eclair Scale Detected");
+                _type   = ECLAIR;
+                _write  = peripheral.characteristic(WRITE_CHAR_ECLAIR);
+                _read   = peripheral.characteristic(READ_CHAR_ECLAIR);
             }
             else{
                 Serial.println("unable to determine scale type");
@@ -131,18 +157,20 @@ bool AcaiaArduinoBLE::init(String mac){
             }else {
                 Serial.println("subscribed!");
             }
-        
-            if(_write.writeValue(IDENTIFY, 20)){
-                Serial.println("identify write successful");
-            }else{
-                Serial.println("identify write failed");
-                return false; 
-            }
-            if(_write.writeValue(NOTIFICATION_REQUEST,14)){
-                Serial.println("notification request write successful");
-            }else{
-                Serial.println("notification request write failed");
-                return false; 
+
+            if(_type != ECLAIR){
+                if(_write.writeValue(IDENTIFY, 20)){
+                    Serial.println("identify write successful");
+                }else{
+                    Serial.println("identify write failed");
+                    return false;
+                }
+                if(_write.writeValue(NOTIFICATION_REQUEST,14)){
+                    Serial.println("notification request write successful");
+                }else{
+                    Serial.println("notification request write failed");
+                    return false;
+                }
             }
             _connected = true;
             _packetPeriod = 0;
@@ -151,11 +179,14 @@ bool AcaiaArduinoBLE::init(String mac){
     }while(millis() - start < 10000);
 
     Serial.println("failed to find scale");
-    return false;    
+    return false;
 }
 
 bool AcaiaArduinoBLE::tare(){
-    if(_write.writeValue((_type == GENERIC ? TARE_GENERIC : TARE_ACAIA), 6)){
+    byte *command = (_type == ECLAIR) ? TARE_ECLAIR : (_type == GENERIC ? TARE_GENERIC : TARE_ACAIA);
+    int length = (_type == ECLAIR) ? 3 : 6;
+
+    if(_write.writeValue(command, length)){
           Serial.println("tare write successful");
           return true;
     }else{
@@ -166,9 +197,11 @@ bool AcaiaArduinoBLE::tare(){
 }
 
 bool AcaiaArduinoBLE::startTimer(){
-    if(_write.writeValue((_type == GENERIC ? START_TIMER_GENERIC : START_TIMER),
-                         (_type == GENERIC ? 6                   : 7))){
-	    Serial.println("start timer write successful");
+    byte *command = (_type == ECLAIR) ? START_TIMER_ECLAIR : (_type == GENERIC ? START_TIMER_GENERIC : START_TIMER);
+    int length = (_type == ECLAIR) ? 3 : (_type == GENERIC ? 6 : 7);
+
+    if(_write.writeValue(command, length)){
+		    Serial.println("start timer write successful");
         return true;
     }else{
         _connected = false;
@@ -178,8 +211,10 @@ bool AcaiaArduinoBLE::startTimer(){
 }
 
 bool AcaiaArduinoBLE::stopTimer(){
-    if(_write.writeValue((_type == GENERIC ? STOP_TIMER_GENERIC : STOP_TIMER),
-                         (_type == GENERIC ? 6                  : 7 ))){
+    byte *command = (_type == ECLAIR) ? STOP_TIMER_ECLAIR : (_type == GENERIC ? STOP_TIMER_GENERIC : STOP_TIMER);
+    int length = (_type == ECLAIR) ? 3 : (_type == GENERIC ? 6 : 7);
+
+    if(_write.writeValue(command, length)){
         Serial.println("stop timer write successful");
         return true;
     }else{
@@ -190,8 +225,10 @@ bool AcaiaArduinoBLE::stopTimer(){
 }
 
 bool AcaiaArduinoBLE::resetTimer(){
-    if(_write.writeValue((_type == GENERIC ? RESET_TIMER_GENERIC : RESET_TIMER),
-                         (_type == GENERIC ? 6                  : 7 ))){
+    byte *command = (_type == ECLAIR) ? RESET_TIMER_ECLAIR : (_type == GENERIC ? RESET_TIMER_GENERIC : RESET_TIMER);
+    int length = (_type == ECLAIR) ? 3 : (_type == GENERIC ? 6 : 7);
+
+    if(_write.writeValue(command, length)){
         Serial.println("reset timer write successful");
         return true;
     }else{
@@ -202,6 +239,10 @@ bool AcaiaArduinoBLE::resetTimer(){
 }
 
 bool AcaiaArduinoBLE::heartbeat(){
+    if(_type == ECLAIR){
+        return true;
+    }
+
     if(_write.writeValue(HEARTBEAT, 7)){
         _lastHeartBeat = millis();
         return true;
@@ -239,7 +280,7 @@ bool AcaiaArduinoBLE::newWeightAvailable(){
         int l = _read.valueLength();
 
         // Get packet
-        if(10 >= l ||                       //10 byte packets for pre-2021 lunar
+        if(10 >= l ||                       //10 byte packets for pre-2021 lunar and Eclair
           (13 >= l && OLD != _type) ||      //13 byte packets for pyxis and older lunar 2021 fw
           (14 == l && OLD == _type) ||      //14 byte packets for lunar 2021 AL008
           (17 == l && NEW == _type) ||      //17 byte packets for newer lunar 2021 fw
@@ -259,10 +300,10 @@ bool AcaiaArduinoBLE::newWeightAvailable(){
         // Parse New style data packet
         if (NEW == _type && (13 == l || 17 == l) && input[4] == 0x05)
         {
-            //Grab weight bytes (5 and 6) 
+            //Grab weight bytes (5 and 6)
             // apply scaling based on the unit byte (9)
             // get sign byte (10)
-            _currentWeight = (((input[6] & 0xff) << 8) + (input[5] & 0xff)) 
+            _currentWeight = (((input[6] & 0xff) << 8) + (input[5] & 0xff))
                             / pow(10,input[9])
                             * ((input[10] & 0x02) ? -1 : 1);
             newWeightPacket = true;
@@ -272,8 +313,8 @@ bool AcaiaArduinoBLE::newWeightAvailable(){
             //Grab weight bytes (2 and 3),
             // apply scaling based on the unit byte (6)
             // get sign byte (7)
-            _currentWeight = (((input[3] & 0xff) << 8) + (input[2] & 0xff)) 
-                            / pow(10, input[6]) 
+            _currentWeight = (((input[3] & 0xff) << 8) + (input[2] & 0xff))
+                            / pow(10, input[6])
                             * ((input[7] & 0x02) ? -1 : 1);
             newWeightPacket = true;
 
@@ -281,12 +322,19 @@ bool AcaiaArduinoBLE::newWeightAvailable(){
             //Grab weight bytes (3-8),
             // get sign byte (2)
             _currentWeight = (( input[7] << 16) | (input[8] << 8) | input[9]);
-	        
+
 	          if (input[6] == 45) { // Check if the value is negative
             _currentWeight = -_currentWeight;
-                }
+            }
             _currentWeight = _currentWeight / 100;
             newWeightPacket = true;
+        }else if( ECLAIR == _type && l == 10 && input[0] == 'W'){
+            if(calculateXOR(input + 1, 8) == input[9]){
+                _currentWeight = readInt32LittleEndian(input + 1) / 1000.0;
+                newWeightPacket = true;
+            }else if(_debug){
+                Serial.println("Eclair packet XOR failed");
+            }
         }
         if(newWeightPacket){
             if(_lastPacket){
@@ -309,7 +357,8 @@ bool AcaiaArduinoBLE::isScaleName(String name){
         || nameShort == "LUNAR"
         || nameShort == "PEARL"
         || nameShort == "PROCH"
-        || nameShort == "BOOKO";
+        || nameShort == "BOOKO"
+        || nameShort == "ECLAI";
 }
 
 void AcaiaArduinoBLE::exploreService(BLEService service) {

@@ -1,5 +1,5 @@
 # AcaiaArduinoBLE
-Acaia / Bookoo Scale Gateway using the ArduinoBLE library for devices such as the esp32, arduino nano esp32, and arduino nano iot 33.
+Acaia / Bookoo / AtomHeart Eclair Scale Gateway using the ArduinoBLE library for devices such as the esp32, arduino nano esp32, and arduino nano iot 33.
 This is an Arduino Library which can be found in the Arduino IDE Library Manager.
 
 ## Scale Compatibility
@@ -11,8 +11,9 @@ This is an Arduino Library which can be found in the Arduino IDE Library Manager
 | Acaia  | Pearl S | USB-Micro                  | v1.0.056 | Ok    | Yes | Yes | Yes
 | Acaia  | Pearl S | USB-C                      | ----     | Ok    | Yes | Yes  | Yes
 | Acaia  | Pyxis   | ----                       | v1.0.022 | Good  | Not Recommended (too sensitive) | Yes | Yes
-| Bookoo | Themis  Mini | ----                       | v1.0.5   | Great | Yes | Yes | Yes 
-| Bookoo | Themis Ultra  | ----                 | ----   | Great | Yes | Yes | Yes 
+| Bookoo | Themis  Mini | ----                       | v1.0.5   | Great | Yes | Yes | Yes
+| Bookoo | Themis Ultra  | ----                 | ----   | Great | Yes | Yes | Yes
+| AtomHeart | Eclair | ----                       | v2.1.0   | Testing | Yes | Yes | Yes
 
 
 ## Requirements
@@ -38,7 +39,7 @@ Join the discord for updates and support: https://discord.gg/NMXb5VYtre
 | Model | Powered by Machine (5V) | Brew State Detection Method | Officially Documented |
 | ----- | ----------------------- | --------------------------- | ---------------- |
 | GS3 | No, requires included power supply | Solenoid Valve (Reed Switch) | Yes |
-| Linea Micra | Yes | Brew Switch | Yes | 
+| Linea Micra | Yes | Brew Switch | Yes |
 | Linea Mini* | Older, non-IoT machines may require a power supply | Brew Switch | Yes |
 | Linea Mini R | Yes | Brew Switch | Yes |
 | Silvia Pro (X) | Yes | Brew Button | Yes |
@@ -122,6 +123,8 @@ Scale Compatibility:
 
 ☑ Bookoo
 
+☑ AtomHeart Eclair
+
 Hardware:
 
 ☑ PCB Design for Low Voltage Switches (V1.1)
@@ -164,7 +167,7 @@ Sales:
 
 ☑ Sales Open for Linea Mini
 
-☑ International Sales Open 
+☑ International Sales Open
 
 ## Bugs/Missing
 1. Tare command is less reliable than pressing the tare button.

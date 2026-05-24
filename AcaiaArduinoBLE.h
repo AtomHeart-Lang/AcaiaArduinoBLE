@@ -1,10 +1,10 @@
 /*
-  AcaiaArduinoBLE.h - Library for connecting to 
+  AcaiaArduinoBLE.h - Library for connecting to
   an Acaia Scale using the ArduinoBLE library.
   Created by Tate Mazer, December 13, 2023.
   Released into the public domain.
 
-  Pio Baettig: Adding Felicita Arc support 
+  Pio Baettig: Adding Felicita Arc support
 
   Known Bugs:
     * Only supports Grams
@@ -12,13 +12,15 @@
 #ifndef AcaiaArduinoBLE_h
 #define AcaiaArduinoBLE_h
 
-#define LIBRARY_VERSION        "3.3.0"
+#define LIBRARY_VERSION        "3.4.0"
 #define WRITE_CHAR_OLD_VERSION "2a80"
 #define READ_CHAR_OLD_VERSION  "2a80"
 #define WRITE_CHAR_NEW_VERSION "49535343-8841-43f4-a8d4-ecbe34729bb3"
 #define READ_CHAR_NEW_VERSION  "49535343-1e4d-4bd9-ba61-23c647249616"
 #define WRITE_CHAR_GENERIC     "ff12"
 #define READ_CHAR_GENERIC      "ff11"
+#define WRITE_CHAR_ECLAIR      "4F9A45BA-8E1B-4E07-E157-0814D393B968"
+#define READ_CHAR_ECLAIR       "AD736C5F-BBC9-1F96-D304-CB5D5F41E160"
 #define HEARTBEAT_PERIOD_MS     2750
 #define MAX_PACKET_PERIOD_MS    5000
 
@@ -28,7 +30,8 @@
 enum scale_type{
     OLD,    // Lunar (pre-2021)
     NEW,    // Lunar (2021), Pyxis
-    GENERIC // Felicita Arc, etc
+    GENERIC, // Felicita Arc, Bookoo, etc
+    ECLAIR
 };
 
 class AcaiaArduinoBLE{
@@ -59,7 +62,7 @@ class AcaiaArduinoBLE{
         long                _lastHeartBeat;
         bool                _connected;
         scale_type          _type;
-        bool                _debug; 
+        bool                _debug;
         long                _packetPeriod;
         long                _lastPacket;
 };
