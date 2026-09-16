@@ -30,6 +30,10 @@ byte START_TIMER_FELICITA[1]        = { 0x52 }; // 'Start_Timer'
 byte STOP_TIMER_FELICITA[1]         = { 0x53 }; // 'Stop_Timer'
 byte RESET_TIMER_FELICITA[1]        = { 0x43 }; // 'Reset_Timer'
 byte WEIGHT_TIMER_MODE_FELICITA[1]  = { 0x32 }; // 'Weight+timer mode (known-good wake state)
+byte TARE_ECLAIR[3]                 = { 0x54, 0x01, 0x01 };
+byte START_TIMER_ECLAIR[3]          = { 0x53, 0x01, 0x01 };
+byte STOP_TIMER_ECLAIR[3]           = { 0x45, 0x01, 0x01 };
+byte RESET_TIMER_ECLAIR[3]          = { 0x52, 0x01, 0x01 };
 
 // Helper struct layout to enable BLEWriteWithoutResponse (0x04) in stock ArduinoBLE
 struct RemoteCharAccess {
@@ -49,6 +53,23 @@ struct CharAccess {
 /* Generic commands from
    https://github.com/graphefruit/Beanconqueror/blob/master/src/classes/devices/felicita/constants.ts
 */
+
+static uint8_t calculateXOR(const byte data[], int length){
+    uint8_t result = 0;
+    for(int i = 0; i < length; i++){
+        result ^= data[i];
+    }
+    return result;
+}
+
+static int32_t readInt32LittleEndian(const byte data[]){
+    return (int32_t)(
+        ((uint32_t)data[0]) |
+        ((uint32_t)data[1] << 8) |
+        ((uint32_t)data[2] << 16) |
+        ((uint32_t)data[3] << 24)
+    );
+}
 
 AcaiaArduinoBLE::AcaiaArduinoBLE(bool debug){
     _debug = debug;
@@ -145,15 +166,22 @@ bool AcaiaArduinoBLE::init(String mac){
                 _type   = FELICITA;
                 _write  = peripheral.characteristic(WRITE_CHAR_FELICITA);
                 _read   = peripheral.characteristic(READ_CHAR_FELICITA);
+            } else if(peripheral.characteristic(READ_CHAR_ECLAIR).canSubscribe()){
+                Serial.println("Eclair Scale Detected");
+                _type   = ECLAIR;
+                _write  = peripheral.characteristic(WRITE_CHAR_ECLAIR);
+                _read   = peripheral.characteristic(READ_CHAR_ECLAIR);
             }
             else{
                 Serial.println("unable to determine scale type");
                 return false;
             }
             // Enable non-blocking writeCmd in stock ArduinoBLE by setting BLEWriteWithoutResponse flag (0x04)
-            CharAccess* ca = (CharAccess*)(void*)&_write;
-            if (ca && ca->remote) {
-                ca->remote->properties |= 0x04;
+            if (_type != ECLAIR) {
+                CharAccess* ca = (CharAccess*)(void*)&_write;
+                if (ca && ca->remote) {
+                    ca->remote->properties |= 0x04;
+                }
             }
 
             if(!_read.canSubscribe()){
@@ -209,6 +237,7 @@ bool AcaiaArduinoBLE::tare(){
     switch(_type){
         case GENERIC:  ok = _write.writeValue(TARE_GENERIC,  sizeof(TARE_GENERIC),  false); break;
         case FELICITA: ok = _write.writeValue(TARE_FELICITA, sizeof(TARE_FELICITA), false); break;
+        case ECLAIR:   ok = _write.writeValue(TARE_ECLAIR,   sizeof(TARE_ECLAIR),   true);  break;
         default:       ok = _write.writeValue(TARE_ACAIA,    sizeof(TARE_ACAIA),    false); break;
     }
     if(ok){
@@ -226,6 +255,7 @@ bool AcaiaArduinoBLE::startTimer(){
     switch(_type){
         case GENERIC:  ok = _write.writeValue(START_TIMER_GENERIC,  sizeof(START_TIMER_GENERIC),  false); break;
         case FELICITA: ok = _write.writeValue(START_TIMER_FELICITA, sizeof(START_TIMER_FELICITA), false); break;
+        case ECLAIR:   ok = _write.writeValue(START_TIMER_ECLAIR,   sizeof(START_TIMER_ECLAIR),   true);  break;
         default:       ok = _write.writeValue(START_TIMER,          sizeof(START_TIMER),          false); break;
     }
     if(ok){
@@ -243,6 +273,7 @@ bool AcaiaArduinoBLE::stopTimer(){
     switch(_type){
         case GENERIC:  ok = _write.writeValue(STOP_TIMER_GENERIC,  sizeof(STOP_TIMER_GENERIC),  false); break;
         case FELICITA: ok = _write.writeValue(STOP_TIMER_FELICITA, sizeof(STOP_TIMER_FELICITA), false); break;
+        case ECLAIR:   ok = _write.writeValue(STOP_TIMER_ECLAIR,   sizeof(STOP_TIMER_ECLAIR),   true);  break;
         default:       ok = _write.writeValue(STOP_TIMER,          sizeof(STOP_TIMER),          false); break;
     }
     if(ok){
@@ -260,6 +291,7 @@ bool AcaiaArduinoBLE::resetTimer(){
     switch(_type){
         case GENERIC:  ok = _write.writeValue(RESET_TIMER_GENERIC,  sizeof(RESET_TIMER_GENERIC),  false); break;
         case FELICITA: ok = _write.writeValue(RESET_TIMER_FELICITA, sizeof(RESET_TIMER_FELICITA), false); break;
+        case ECLAIR:   ok = _write.writeValue(RESET_TIMER_ECLAIR,   sizeof(RESET_TIMER_ECLAIR),   true);  break;
         default:       ok = _write.writeValue(RESET_TIMER,          sizeof(RESET_TIMER),          false); break;
     }
     if(ok){
@@ -273,7 +305,13 @@ bool AcaiaArduinoBLE::resetTimer(){
 }
 
 bool AcaiaArduinoBLE::tareStartTimer(){
-    if(_write.writeValue(TARE_START_TIMER_BOOKOO, 6, false)){
+    bool ok;
+    if(_type == ECLAIR){
+        ok = _write.writeValue(START_TIMER_ECLAIR, sizeof(START_TIMER_ECLAIR), true);
+    }else{
+        ok = _write.writeValue(TARE_START_TIMER_BOOKOO, sizeof(TARE_START_TIMER_BOOKOO), false);
+    }
+    if(ok){
           Serial.println("tare and start timer write successful");
           return true;
     }else{
@@ -284,9 +322,13 @@ bool AcaiaArduinoBLE::tareStartTimer(){
 }
 
 bool AcaiaArduinoBLE::beep(){
-
-    // for acaia's, use the tare command to generate the beep
-    if(_write.writeValue((_type == GENERIC ? BEEP_LEVEL_1_BOOKOO : TARE_ACAIA), 6, false)){
+    bool ok;
+    switch(_type){
+        case GENERIC: ok = _write.writeValue(BEEP_LEVEL_1_BOOKOO, sizeof(BEEP_LEVEL_1_BOOKOO), false); break;
+        case ECLAIR:  ok = _write.writeValue(TARE_ECLAIR,         sizeof(TARE_ECLAIR),         true);  break;
+        default:      ok = _write.writeValue(TARE_ACAIA,          sizeof(TARE_ACAIA),          false); break;
+    }
+    if(ok){
           Serial.println("beep write successful");
           return true;
     }else{
@@ -297,6 +339,10 @@ bool AcaiaArduinoBLE::beep(){
 }
 
 bool AcaiaArduinoBLE::heartbeat(){
+    if(_type == ECLAIR){
+        return true;
+    }
+
     if(_write.writeValue(HEARTBEAT, 7, false)){
         _lastHeartBeat = millis();
         return true;
@@ -334,7 +380,7 @@ bool AcaiaArduinoBLE::newWeightAvailable(){
         int l = _read.valueLength();
 
         // Get packet
-        if(10 >= l ||                       //10 byte packets for pre-2021 lunar
+        if(10 >= l ||                       //10 byte packets for pre-2021 lunar and Eclair
           (13 >= l && OLD != _type) ||      //13 byte packets for pyxis and older lunar 2021 fw
           (14 == l && OLD == _type) ||      //14 byte packets for lunar 2021 AL008
           (17 == l && NEW == _type) ||      //17 byte packets for newer lunar 2021 fw
@@ -396,6 +442,14 @@ bool AcaiaArduinoBLE::newWeightAvailable(){
                   + (input[7] - 0x30) * 0.1
                   + (input[8] - 0x30) * 0.01 );
             newWeightPacket = true;
+
+        }else if( ECLAIR == _type && l == 10 && input[0] == 'W'){
+            if(calculateXOR(input + 1, 8) == input[9]){
+                _currentWeight = readInt32LittleEndian(input + 1) / 1000.0;
+                newWeightPacket = true;
+            }else if(_debug){
+                Serial.println("Eclair packet XOR failed");
+            }
         }
         if(newWeightPacket){
             if(_lastPacket){
@@ -419,7 +473,8 @@ bool AcaiaArduinoBLE::isScaleName(String name){
         || nameShort == "PEARL"
         || nameShort == "PROCH"
         || nameShort == "BOOKO"
-        || nameShort == "FELIC";
+        || nameShort == "FELIC"
+        || nameShort == "ECLAI";
 }
 
 void AcaiaArduinoBLE::exploreService(BLEService service) {
